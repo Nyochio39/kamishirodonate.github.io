@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Donate System</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f5f5; color: #111; min-height: 100vh; }
+
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+    background: #fff; border-right: 1px solid #e5e5e5;
+    padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 4px; z-index: 10;
+  }
+  .sidebar-logo { font-size: 15px; font-weight: 700; padding: 0 8px 1.2rem; border-bottom: 1px solid #eee; margin-bottom: 8px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 500; color: #555; transition: all 0.12s;
+  }
+  .nav-item:hover { background: #f0f0f0; color: #111; }
+  .nav-item.active { background: #111; color: #fff; }
+
+  .main { margin-left: 220px; padding: 2rem; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 1.5rem; }
+  h2 { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 12px; margin-bottom: 2rem; }
+  .stat-card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.2rem; }
+  .stat-label { font-size: 12px; color: #888; margin-bottom: 6px; font-weight: 500; }
+  .stat-value { font-size: 26px; font-weight: 600; }
+  .stat-sub { font-size: 12px; color: #aaa; margin-top: 4px; }
+
+  .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: #888; padding: 0 12px 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 11px 12px; border-top: 1px solid #f0f0f0; vertical-align: middle; }
+  tr:first-child td { border-top: none; }
+
+  .amount-pill { display: inline-block; padding: 2px 10px; border-radius: 20px; background: #f0f0f0; font-weight: 600; font-size: 13px; }
+  .top1 .amount-pill { background: #ffd700; color: #7a5c00; }
+  .top2 .amount-pill { background: #e8e8e8; color: #444; }
+  .top3 .amount-pill { background: #f0c090; color: #7a4400; }
+  .msg-text { color: #666; font-size: 13px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .time-text { color: #bbb; font-size: 12px; }
+  .method-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #f0f0f0; color: #555; }
+
+  label { display: block; font-size: 13px; font-weight: 500; color: #555; margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; font-family: inherit; color: #111; background: #fafafa;
+    outline: none; margin-bottom: 14px; transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: #111; background: #fff; }
+
+  .btn { padding: 9px 20px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.12s; background: #fff; color: #111; }
+  .btn:hover { background: #f0f0f0; }
+  .btn-primary { background: #111; color: #fff; border-color: #111; }
+  .btn-primary:hover { opacity: 0.85; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 6px; background: #fee; color: #c00;
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 10px;
+  }
+  .live-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  .refresh-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .refresh-text { font-size: 12px; color: #bbb; }
+
+  .notification {
+    position: fixed; bottom: 24px; right: 24px; background: #111; color: #fff;
+    padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 999;
+    display: none; animation: slideIn 0.25s ease;
+  }
+  @keyframes slideIn { from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1} }
+
+  .empty { text-align: center; color: #bbb; padding: 3rem 0; font-size: 14px; }
+
+  .setup-banner {
+    background: #fffbf0; border: 1px solid #fed; border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 1.5rem; font-size: 13px; color: #8a6000;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .setup-steps { font-size: 13px; color: #555; line-height: 2; }
+  .setup-steps span { font-weight: 600; color: #111; }
+
+  .api-key-wrap { position: relative; }
+  .api-key-wrap input { padding-right: 80px; }
+  .toggle-eye { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); margin-top: -7px; font-size: 13px; cursor: pointer; color: #888; background: none; border: none; font-family: inherit; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">🎙️ Donate Panel</div>
+  <div class="nav-item active" onclick="showPage('overview',this)">📊 ภาพรวม</div>
+  <div class="nav-item" onclick="showPage('donations',this)">💰 รายการโดเนท</div>
+  <div class="nav-item" onclick="showPage('topdonors',this)">🏆 Top Donors</div>
+  <div class="nav-item" onclick="showPage('settings',this)">⚙️ ตั้งค่า</div>
+  <div style="margin-top:auto; padding-top:1rem; border-top:1px solid #eee;">
+    <div class="nav-item" onclick="clearAll()" style="color:#c00;">🗑️ ล้างข้อมูลวันนี้</div>
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- Overview -->
+  <div class="page active" id="page-overview">
+    <div style="display:flex;align-items:center;margin-bottom:1.5rem;">
+      <h1 style="margin:0">ภาพรวมวันนี้</h1>
+      <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+    </div>
+
+    <div id="setupBanner"></div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">ยอดโดเนทรวม</div><div class="stat-value" id="statTotal">฿0</div><div class="stat-sub">วันนี้</div></div>
+      <div class="stat-card"><div class="stat-label">จำนวนครั้ง</div><div class="stat-value" id="statCount">0</div><div class="stat-sub">ครั้ง</div></div>
+      <div class="stat-card"><div class="stat-label">ค่าเฉลี่ย</div><div class="stat-value" id="statAvg">฿0</div><div class="stat-sub">ต่อครั้ง</div></div>
+      <div class="stat-card"><div class="stat-label">Top Donor วันนี้</div><div class="stat-value" style="font-size:17px" id="statTop">—</div><div class="stat-sub" id="statTopAmt"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="refresh-bar">
+        <h2 style="margin:0">รายการล่าสุด</h2>
+        <span class="refresh-text" id="refreshText">อัปเดตอัตโนมัติ</span>
+      </div>
+      <table>
+        <thead><tr><th>ชื่อ</th><th>จำนวน</th><th>ช่องทาง</th><th>ข้อความ</th><th>เวลา</th></tr></thead>
+        <tbody id="recentBody"><tr><td colspan="5" class="empty">ยังไม่มีการโดเนท</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Donations -->
+  <div class="page" id="page-donations">
+    <h1>รายการโดเนททั้งหมด</h1>
+    <div class="card">
+      <table>
+        <thead><tr><th>#</th><th>ชื่อ</th><th>จำนวน</th><th>ช่องทาง</th><th>ข้อความ</th><th>เวลา</th></tr></thead>
+        <tbody id="allBody"><tr><td colspan="6" class="empty">ยังไม่มีการโดเนท</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Top Donors -->
+  <div class="page" id="page-topdonors">
+    <h1>🏆 Top Donors วันนี้</h1>
+    <div class="card">
+      <table>
+        <thead><tr><th>อันดับ</th><th>ชื่อ</th><th>ยอดรวม</th><th>ครั้ง</th></tr></thead>
+        <tbody id="topBody"><tr><td colspan="4" class="empty">ยังไม่มีข้อมูล</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="page" id="page-settings">
+    <h1>⚙️ ตั้งค่า</h1>
+
+    <div class="setup-banner">
+      <span style="font-size:18px">📋</span>
+      <div class="setup-steps">
+        วิธีขอ SlipOK API Key: ไปที่ <a href="https://slipok.com" target="_blank" style="color:#8a6000"><u>slipok.com</u></a> → สมัครฟรี → กด "สร้าง API Key" → ก๊อปมาใส่ด้านล่าง<br>
+        ฟรี <span>50 ครั้ง/เดือน</span> เหมาะสำหรับช่อง Live ขนาดเล็ก–กลาง
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <h2>ข้อมูล Channel</h2>
+          <label>ชื่อ Channel</label>
+          <input type="text" id="cfg-name" placeholder="ชื่อของคุณ">
+          <label>เบอร์ PromptPay (มือถือ)</label>
+          <input type="tel" id="cfg-pp" placeholder="08X-XXX-XXXX">
+          <label>เบอร์ TrueMoney Wallet</label>
+          <input type="tel" id="cfg-tm" placeholder="ใส่ถ้าต่างจาก PromptPay">
+
+          <h2 style="margin-top:0.5rem">SlipOK API</h2>
+          <label>API Key <span style="color:#bbb;font-weight:400">(จาก slipok.com)</span></label>
+          <div class="api-key-wrap">
+            <input type="password" id="cfg-slipok" placeholder="SLIPOK-XXXXXXXX">
+            <button class="toggle-eye" onclick="toggleKey()">แสดง</button>
+          </div>
+          <div style="font-size:12px; color:#aaa; margin-top:-10px; margin-bottom:16px;">
+            ถ้ายังไม่มี Key ระบบจะทำงานโหมด Demo (ไม่ตรวจสอบจริง)
+          </div>
+
+          <button class="btn btn-primary" onclick="saveConfig()">บันทึกการตั้งค่า</button>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h2>🔗 ลิงก์สำหรับใช้งาน</h2>
+
+          <label>หน้าโดเนท — ส่งให้ผู้ชม</label>
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <input type="text" id="linkDonate" readonly onclick="this.select()" style="cursor:pointer;background:#f5f5f5;margin-bottom:0;flex:1;font-size:13px;">
+            <button class="btn btn-primary" id="copyDonateBtn" onclick="copyLink('linkDonate','copyDonateBtn')" style="white-space:nowrap;padding:9px 14px;">📋 คัดลอก</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:20px;">
+            <button class="btn" onclick="openLink('linkDonate')" style="flex:1;font-size:13px;">🌐 เปิดหน้าโดเนท</button>
+            <button class="btn" onclick="shareLink('linkDonate')" id="shareBtn" style="flex:1;font-size:13px;">📤 แชร์</button>
+          </div>
+
+          <label>OBS Browser Source — Alert Overlay</label>
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <input type="text" id="linkOverlay" readonly onclick="this.select()" style="cursor:pointer;background:#f5f5f5;margin-bottom:0;flex:1;font-size:13px;">
+            <button class="btn" id="copyOverlayBtn" onclick="copyLink('linkOverlay','copyOverlayBtn')" style="white-space:nowrap;padding:9px 14px;">📋 คัดลอก</button>
+          </div>
+
+          <div style="background:#fafafa; border-radius:10px; padding:14px; font-size:13px; color:#666; line-height:1.8;">
+            <strong style="color:#111">วิธีใช้ OBS:</strong><br>
+            Add Source → Browser → วาง URL ด้านบน<br>
+            Width: <strong>420</strong> / Height: <strong>120</strong><br>
+            วางมุมขวาบนของ Scene
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="notification" id="notification"></div>
+
+<script>
+  const CONFIG_KEY = 'streamer_config';
+  const DONATION_KEY = () => 'donations_' + new Date().toDateString();
+
+  function getDonations() { try { return JSON.parse(localStorage.getItem(DONATION_KEY()) || '[]'); } catch(e) { return []; } }
+  function getConfig() { try { return JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}'); } catch(e) { return {}; } }
+
+  function showPage(id, el) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-'+id).classList.add('active');
+    el.classList.add('active');
+    if (id==='overview') renderOverview();
+    if (id==='donations') renderAll();
+    if (id==='topdonors') renderTop();
+    if (id==='settings') loadSettings();
+  }
+
+  function fmt(n) { return '฿' + n.toLocaleString(); }
+  function timeAgo(iso) {
+    const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (diff < 60) return diff + 'วิ';
+    if (diff < 3600) return Math.floor(diff/60) + 'นาที';
+    return new Date(iso).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  }
+  function methodLabel(m) {
+    if (m === 'truemoney') return '<span class="method-badge" style="background:#fee;color:#c00">TrueMoney</span>';
+    return '<span class="method-badge" style="background:#e8f5e9;color:#2e7d32">PromptPay</span>';
+  }
+
+  function renderOverview() {
+    const cfg = getConfig();
+    const missing = [];
+    if (!cfg.promptpayNumber) missing.push('เบอร์ PromptPay');
+    if (!cfg.slipokKey) missing.push('SlipOK API Key');
+    const banner = document.getElementById('setupBanner');
+    if (missing.length) {
+      banner.innerHTML = `<div class="setup-banner">⚠️ ยังไม่ได้ตั้งค่า: <strong>${missing.join(', ')}</strong> — ไปที่หน้า <a href="#" onclick="document.querySelectorAll('.nav-item')[3].click()" style="color:#8a6000"><u>ตั้งค่า</u></a></div>`;
+    } else { banner.innerHTML = ''; }
+
+    const d = getDonations();
+    const total = d.reduce((s,x) => s+x.amount, 0);
+    document.getElementById('statTotal').textContent = fmt(total);
+    document.getElementById('statCount').textContent = d.length;
+    document.getElementById('statAvg').textContent = d.length ? fmt(Math.round(total/d.length)) : '฿0';
+
+    const topMap = {};
+    d.forEach(x => topMap[x.name] = (topMap[x.name]||0)+x.amount);
+    const top = Object.entries(topMap).sort((a,b)=>b[1]-a[1])[0];
+    if (top) { document.getElementById('statTop').textContent = top[0]; document.getElementById('statTopAmt').textContent = fmt(top[1]); }
+
+    const recent = [...d].reverse().slice(0,10);
+    document.getElementById('recentBody').innerHTML = recent.length
+      ? recent.map(x => `<tr><td style="font-weight:500">${x.name}</td><td><span class="amount-pill">${fmt(x.amount)}</span></td><td>${methodLabel(x.method)}</td><td class="msg-text">${x.msg||'<span style="color:#ccc">—</span>'}</td><td class="time-text">${timeAgo(x.time)}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="empty">ยังไม่มีการโดเนท</td></tr>';
+  }
+
+  function renderAll() {
+    const d = [...getDonations()].reverse();
+    document.getElementById('allBody').innerHTML = d.length
+      ? d.map((x,i)=>`<tr><td style="color:#bbb;font-size:13px">${i+1}</td><td style="font-weight:500">${x.name}</td><td><span class="amount-pill">${fmt(x.amount)}</span></td><td>${methodLabel(x.method)}</td><td class="msg-text">${x.msg||'<span style="color:#ccc">—</span>'}</td><td class="time-text">${timeAgo(x.time)}</td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty">ยังไม่มีการโดเนท</td></tr>';
+  }
+
+  function renderTop() {
+    const d = getDonations();
+    const topMap = {}, cntMap = {};
+    d.forEach(x => { topMap[x.name]=(topMap[x.name]||0)+x.amount; cntMap[x.name]=(cntMap[x.name]||0)+1; });
+    const sorted = Object.entries(topMap).sort((a,b)=>b[1]-a[1]);
+    const medals = ['🥇','🥈','🥉'];
+    const cls = ['top1','top2','top3'];
+    document.getElementById('topBody').innerHTML = sorted.length
+      ? sorted.map(([name,total],i)=>`<tr class="${cls[i]||''}"><td>${medals[i]||(i+1)}</td><td style="font-weight:500">${name}</td><td><span class="amount-pill">${fmt(total)}</span></td><td style="color:#888;font-size:13px">${cntMap[name]} ครั้ง</td></tr>`).join('')
+      : '<tr><td colspan="4" class="empty">ยังไม่มีข้อมูล</td></tr>';
+  }
+
+  function loadSettings() {
+    const c = getConfig();
+    document.getElementById('cfg-name').value = c.name || '';
+    document.getElementById('cfg-pp').value = c.promptpayNumber || '';
+    document.getElementById('cfg-tm').value = c.truemoneyNumber || '';
+    document.getElementById('cfg-slipok').value = c.slipokKey || '';
+  }
+
+  function toggleKey() {
+    const inp = document.getElementById('cfg-slipok');
+    const btn = inp.nextElementSibling;
+    if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'ซ่อน'; }
+    else { inp.type = 'password'; btn.textContent = 'แสดง'; }
+  }
+
+  function saveConfig() {
+    const cfg = {
+      name: document.getElementById('cfg-name').value.trim(),
+      promptpayNumber: document.getElementById('cfg-pp').value.trim(),
+      truemoneyNumber: document.getElementById('cfg-tm').value.trim(),
+      slipokKey: document.getElementById('cfg-slipok').value.trim(),
+    };
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+    showNotif('บันทึกแล้ว ✓');
+  }
+
+  function clearAll() {
+    if (!confirm('ล้างข้อมูลโดเนทวันนี้ทั้งหมด?')) return;
+    localStorage.removeItem(DONATION_KEY());
+    renderOverview();
+    showNotif('ล้างข้อมูลแล้ว');
+  }
+
+  function showNotif(msg) {
+    const el = document.getElementById('notification');
+    el.textContent = msg; el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 2500);
+  }
+
+  // =====================
+  //  Link helpers
+  // =====================
+  function getBaseURL() {
+    const loc = window.location;
+    // ถ้าเปิดจากไฟล์โดยตรง (file://) ให้แสดง path
+    if (loc.protocol === 'file:') {
+      return loc.href.replace('dashboard.html', '');
+    }
+    return loc.origin + loc.pathname.replace('dashboard.html', '');
+  }
+
+  function initLinks() {
+    const base = getBaseURL();
+    document.getElementById('linkDonate').value = base + 'donate.html';
+    document.getElementById('linkOverlay').value = base + 'alert-overlay.html';
+    // ซ่อนปุ่มแชร์ถ้า browser ไม่รองรับ
+    if (!navigator.share) document.getElementById('shareBtn').style.display = 'none';
+  }
+
+  function copyLink(inputId, btnId) {
+    const val = document.getElementById(inputId).value;
+    navigator.clipboard.writeText(val).then(() => {
+      const btn = document.getElementById(btnId);
+      const orig = btn.textContent;
+      btn.textContent = '✅ คัดลอกแล้ว';
+      btn.style.background = '#f0fdf4';
+      btn.style.borderColor = '#22c55e';
+      btn.style.color = '#16a34a';
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 2000);
+    }).catch(() => {
+      // fallback สำหรับ browser เก่า
+      const el = document.getElementById(inputId);
+      el.select();
+      document.execCommand('copy');
+      showNotif('คัดลอกแล้ว ✓');
+    });
+  }
+
+  function openLink(inputId) {
+    const url = document.getElementById(inputId).value;
+    window.open(url, '_blank');
+  }
+
+  function shareLink(inputId) {
+    const url = document.getElementById(inputId).value;
+    if (navigator.share) {
+      navigator.share({ title: 'โดเนท Live Stream', url });
+    }
+  }
+
+  initLinks();
+  renderOverview();
+  setInterval(() => {
+    if (document.getElementById('page-overview').classList.contains('active')) {
+      renderOverview();
+      document.getElementById('refreshText').textContent = 'อัปเดตล่าสุด: ' + new Date().toLocaleTimeString('th-TH');
+    }
+  }, 5000);
+</script>
+</body>
+</html>
