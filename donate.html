@@ -115,17 +115,6 @@
   <div class="section active" id="step1">
     <label>ชื่อของคุณ</label>
     <input type="text" id="donorName" placeholder="Anonymous" maxlength="40">
-    <label>เลือกจำนวนเงิน (บาท)</label>
-    <div class="amount-grid">
-      <div class="amount-btn" data-val="20">฿20</div>
-      <div class="amount-btn" data-val="50">฿50</div>
-      <div class="amount-btn" data-val="100">฿100</div>
-      <div class="amount-btn" data-val="200">฿200</div>
-      <div class="amount-btn" data-val="500">฿500</div>
-      <div class="amount-btn" data-val="1000">฿1,000</div>
-    </div>
-    <label>หรือกรอกจำนวนเอง</label>
-    <div class="custom-wrap"><span>฿</span><input type="number" id="customAmount" placeholder="จำนวนเงิน" min="1"></div>
     <label>ข้อความถึง Streamer <span style="color:#bbb;font-weight:400">(ไม่บังคับ)</span></label>
     <textarea id="donorMsg" placeholder="ข้อความที่จะแสดงบน stream..." maxlength="200"></textarea>
     <button class="btn btn-dark" id="nextBtn" onclick="goToPayment()">ถัดไป — เลือกช่องทางชำระเงิน →</button>
@@ -235,24 +224,10 @@ async function init() {
   document.getElementById('avatarEl').textContent = name[0].toUpperCase();
   document.getElementById('loadingOverlay').style.display = 'none';
 
-  document.querySelectorAll('.amount-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectedAmount = parseInt(btn.dataset.val);
-      document.getElementById('customAmount').value = '';
-    });
-  });
-  document.getElementById('customAmount').addEventListener('input', () => {
-    document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
-    selectedAmount = null;
-  });
+  // Amount is read from slip — no manual selection needed
 }
 
-function getAmount() {
-  const c = parseInt(document.getElementById('customAmount').value);
-  return selectedAmount || (c > 0 ? c : null);
-}
+function getAmount() { return null; } // Amount read from slip
 
 // Steps
 function setStep(n) {
@@ -271,20 +246,18 @@ function setStep(n) {
 window.goBack = (to) => setStep(to);
 
 window.goToPayment = () => {
-  const amount = getAmount();
-  if (!amount) { alert('กรุณาเลือกหรือกรอกจำนวนเงิน'); return; }
   const name = document.getElementById('donorName').value.trim() || 'Anonymous';
-  donationData = { name, amount, msg: document.getElementById('donorMsg').value.trim() };
+  donationData = { name, amount: null, msg: document.getElementById('donorMsg').value.trim() };
   const ppNum = cfg.promptpayNumber || '—';
   const tmNum = cfg.truemoneyNumber || ppNum;
   const sName = cfg.name || 'Kamishiro';
   document.getElementById('ppNumber').textContent = ppNum;
-  document.getElementById('ppAmount').textContent = '฿' + amount.toLocaleString();
+  document.getElementById('ppAmount').textContent = 'อ่านจากสลิป';
   document.getElementById('ppReceiver').textContent = sName;
-  document.getElementById('qrAmount').textContent = '฿' + amount.toLocaleString();
+  document.getElementById('qrAmount').textContent = '';
   document.getElementById('qrName').textContent = sName;
   document.getElementById('tmNumber').textContent = tmNum;
-  document.getElementById('tmAmount').textContent = '฿' + amount.toLocaleString();
+  document.getElementById('tmAmount').textContent = 'อ่านจากสลิป';
   setStep(2);
 };
 
@@ -319,8 +292,10 @@ window.verifySlip = async () => {
 
   const apiKey = cfg.slipokKey || '';
   if (!apiKey) {
+    // Demo mode: no real slip check — amount unknown
     await new Promise(r => setTimeout(r, 1800));
-    await saveDonation();
+    showStatus('error', '⚠️', 'ไม่มี SlipOK API Key', 'กรุณาตั้งค่า SlipOK Key ใน Dashboard เพื่อตรวจสอบสลิปและอ่านยอดเงินอัตโนมัติ');
+    document.getElementById('verifyBtn').disabled = false;
     return;
   }
 
@@ -330,7 +305,8 @@ window.verifySlip = async () => {
     const res  = await fetch('https://api.slipok.com/api/line/apikey/' + apiKey, { method:'POST', body:form });
     const data = await res.json();
     if (data.success) {
-      await saveDonation(data.data?.amount);
+      const slipAmount = parseFloat(data.data?.amount) || 0;
+      await saveDonation(slipAmount);
     } else {
       showStatus('error', '❌', 'ตรวจสอบไม่ผ่าน', data.message || 'กรุณาลองใหม่');
       document.getElementById('verifyBtn').disabled = false;
@@ -342,11 +318,13 @@ window.verifySlip = async () => {
 };
 
 async function saveDonation(verifiedAmount) {
-  showStatus('success', '✅', 'ตรวจสอบสำเร็จ!', 'กำลังแสดงบน Stream...');
+  // ใช้ยอดจากสลิปเป็นหลัก (verifiedAmount) ถ้าไม่มีใช้ 0
+  const finalAmount = verifiedAmount || 0;
+  showStatus('success', '✅', 'ตรวจสอบสำเร็จ! ยอด ฿' + finalAmount.toLocaleString(), 'กำลังแสดงบน Stream...');
   const donation = {
     id: Date.now(),
     name: donationData.name,
-    amount: verifiedAmount || donationData.amount,
+    amount: finalAmount,
     msg: donationData.msg || '',
     time: new Date().toISOString(),
     method: currentTab
@@ -359,9 +337,9 @@ async function saveDonation(verifiedAmount) {
 
   setTimeout(() => {
     document.getElementById('sName').textContent = donation.name;
-    document.getElementById('sAmount').textContent = '฿' + donation.amount.toLocaleString();
+    document.getElementById('sAmount').textContent = finalAmount > 0 ? '฿' + finalAmount.toLocaleString() : '—';
     document.getElementById('sMsg').textContent = donation.msg || '—';
-    document.getElementById('successSubText').textContent = donation.name + ' โดเนท ฿' + donation.amount.toLocaleString() + ' สำเร็จแล้ว!';
+    document.getElementById('successSubText').textContent = donation.name + ' โดเนท ฿' + finalAmount.toLocaleString() + ' สำเร็จแล้ว!';
     setStep('success');
     document.getElementById('stepsBar').style.display = 'none';
   }, 1200);
@@ -390,7 +368,7 @@ window.copyTM = () => {
 
 window.resetAll = () => {
   slipFile = null; selectedAmount = null; donationData = {};
-  ['donorName','customAmount','donorMsg'].forEach(id => document.getElementById(id).value = '');
+  ['donorName','donorMsg'].forEach(id => document.getElementById(id).value = '');
   document.querySelectorAll('.amount-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('uploadZone').classList.remove('has-file');
   document.getElementById('uploadIcon').textContent = '📎';
