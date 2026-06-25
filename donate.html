@@ -300,19 +300,36 @@ window.verifySlip = async () => {
   }
 
   try {
-    const form = new FormData();
-    form.append('files', slipFile);
-    const res  = await fetch('https://api.slipok.com/api/line/apikey/' + apiKey, { method:'POST', body:form });
+    // แปลง image เป็น base64 แล้วส่งผ่าน Netlify Function (proxy) เพื่อหลีกเลี่ยง CORS
+    const imageBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(slipFile);
+    });
+
+    const res = await fetch('/api/verify-slip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageBase64,
+        mimeType: slipFile.type,
+        apiKey
+      })
+    });
+
     const data = await res.json();
+
     if (data.success) {
       const slipAmount = parseFloat(data.data?.amount) || 0;
       await saveDonation(slipAmount);
     } else {
-      showStatus('error', '❌', 'ตรวจสอบไม่ผ่าน', data.message || 'กรุณาลองใหม่');
+      const msg = data.message || 'สลิปไม่ถูกต้อง';
+      showStatus('error', '❌', 'ตรวจสอบไม่ผ่าน', msg + ' — กรุณาลองใหม่หรือติดต่อ Streamer');
       document.getElementById('verifyBtn').disabled = false;
     }
   } catch(e) {
-    showStatus('error', '❌', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่');
+    showStatus('error', '❌', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อได้: ' + e.message);
     document.getElementById('verifyBtn').disabled = false;
   }
 };
