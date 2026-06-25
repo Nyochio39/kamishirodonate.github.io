@@ -2,150 +2,107 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<title>Alert Overlay</title>
+<title>Alert Overlay — Kamishiro</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: transparent;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    display: flex; align-items: flex-start; justify-content: flex-end;
-    padding: 20px;
-    min-height: 100vh;
-    overflow: hidden;
-  }
-
+  body { background: transparent; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; align-items: flex-start; justify-content: flex-end; padding: 20px; min-height: 100vh; overflow: hidden; }
   .alert-box {
-    background: rgba(15,15,15,0.92);
-    color: #fff;
-    border-radius: 16px;
-    padding: 18px 22px;
-    min-width: 280px;
-    max-width: 380px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(12px);
-    transform: translateY(-20px);
-    opacity: 0;
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    pointer-events: none;
+    background: rgba(15,15,15,0.92); color: #fff; border-radius: 16px; padding: 18px 22px;
+    min-width: 280px; max-width: 380px; display: flex; align-items: center; gap: 14px;
+    border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);
+    transform: translateY(-20px); opacity: 0;
+    transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); pointer-events: none; position: relative;
   }
-
-  .alert-box.show {
-    transform: translateY(0);
-    opacity: 1;
-  }
-
-  .alert-box.hide {
-    transform: translateY(-20px);
-    opacity: 0;
-    transition: all 0.3s ease-in;
-  }
-
+  .alert-box.show { transform: translateY(0); opacity: 1; }
+  .alert-box.hide { transform: translateY(-20px); opacity: 0; transition: all 0.3s ease-in; }
   .alert-icon { font-size: 32px; flex-shrink: 0; }
-
-  .alert-content {}
   .alert-title { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
   .alert-title span { color: #ffd700; }
   .alert-msg { font-size: 13px; opacity: 0.7; line-height: 1.4; }
-
-  .progress-bar {
-    position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
-    background: rgba(255,255,255,0.15); border-radius: 0 0 16px 16px; overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%; background: linear-gradient(90deg, #ffd700, #ff9500);
-    transition: width linear;
-  }
-
-  /* OBS chroma key helper — set OBS filter to chroma key green */
-  body.chroma { background: #00b140; }
+  .progress-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.15); border-radius: 0 0 16px 16px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg,#ffd700,#ff9500); transition: width linear; }
 </style>
 </head>
 <body>
-
-<div class="alert-box" id="alertBox" style="position:relative;">
+<div class="alert-box" id="alertBox">
   <div class="alert-icon" id="alertIcon">🎉</div>
-  <div class="alert-content">
+  <div>
     <div class="alert-title" id="alertTitle">ชื่อ <span id="alertAmount">฿0</span></div>
     <div class="alert-msg" id="alertMsg"></div>
   </div>
   <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:100%"></div></div>
 </div>
 
-<audio id="alertSound" preload="auto">
-  <!-- ไม่ได้ฝัง audio จริง — ใช้ Web Audio API แทน -->
-</audio>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onChildAdded, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-<script>
-  let lastDonation = null;
-  let hideTimer = null;
+const firebaseConfig = {
+  apiKey: "AIzaSyDdQzYgzyNlPr4kxpzKbItxBs1MEX9LuOo",
+  authDomain: "kamishiro-donate-df505.firebaseapp.com",
+  databaseURL: "https://kamishiro-donate-df505-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "kamishiro-donate-df505",
+  storageBucket: "kamishiro-donate-df505.firebasestorage.app",
+  messagingSenderId: "153901731109",
+  appId: "1:153901731109:web:8247c96293aa007779decc"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
 
-  function playChime() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const freqs = [523, 659, 784, 1047];
-      freqs.forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        osc.type = 'sine';
-        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
-        gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + i * 0.12 + 0.05);
-        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.12 + 0.4);
-        osc.start(ctx.currentTime + i * 0.12);
-        osc.stop(ctx.currentTime + i * 0.12 + 0.5);
-      });
-    } catch(e) {}
-  }
+const DURATION = 6000;
+let hideTimer = null;
+let isFirst = true; // skip existing alerts on page load
 
-  function showAlert(donation) {
-    const box = document.getElementById('alertBox');
-    const DURATION = 6000;
+// Listen to new alerts in real-time
+onChildAdded(ref(db, 'alerts'), (snap) => {
+  // Skip alerts that already existed before overlay opened
+  if (isFirst) { isFirst = false; return; }
+  const data = snap.val();
+  if (!data || data.seen) return;
+  showAlert(data);
+  // Mark as seen
+  update(snap.ref, { seen: true });
+});
 
-    document.getElementById('alertTitle').innerHTML =
-      `<span style="color:#ffd700">${donation.name}</span> โดเนท ฿${donation.amount.toLocaleString()}`;
-    document.getElementById('alertMsg').textContent = donation.msg || '';
-    document.getElementById('alertIcon').textContent =
-      donation.amount >= 500 ? '🎊' : donation.amount >= 200 ? '⭐' : '🎉';
+// After 1s, start listening for real new ones
+setTimeout(() => { isFirst = false; }, 1000);
 
-    box.classList.remove('hide');
-    box.classList.add('show');
+function showAlert(d) {
+  const box   = document.getElementById('alertBox');
+  const EMOJI = d.amount >= 500 ? '🎊' : d.amount >= 200 ? '⭐' : '🎉';
+  document.getElementById('alertIcon').textContent  = EMOJI;
+  document.getElementById('alertTitle').innerHTML   = '<span style="color:#ffd700">' + d.name + '</span> โดเนท ฿' + d.amount.toLocaleString();
+  document.getElementById('alertMsg').textContent   = d.msg || '';
 
-    const fill = document.getElementById('progressFill');
-    fill.style.transition = 'none';
-    fill.style.width = '100%';
-    setTimeout(() => {
-      fill.style.transition = `width ${DURATION}ms linear`;
-      fill.style.width = '0%';
-    }, 50);
+  box.classList.remove('hide'); box.classList.add('show');
 
-    playChime();
+  const fill = document.getElementById('progressFill');
+  fill.style.transition = 'none'; fill.style.width = '100%';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    fill.style.transition = 'width ' + DURATION + 'ms linear';
+    fill.style.width = '0%';
+  }));
 
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-      box.classList.remove('show');
-      box.classList.add('hide');
-    }, DURATION);
-  }
+  playChime();
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { box.classList.remove('show'); box.classList.add('hide'); }, DURATION);
+}
 
-  function checkNewDonation() {
-    try {
-      const raw = localStorage.getItem('latest_donation');
-      if (!raw) return;
-      const donation = JSON.parse(raw);
-      if (!lastDonation || donation.id !== lastDonation.id) {
-        lastDonation = donation;
-        showAlert(donation);
-      }
-    } catch(e) {}
-  }
-
-  // Poll every 1s
-  setInterval(checkNewDonation, 1000);
-  checkNewDonation();
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523,659,784,1047].forEach((freq,i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.12;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t+0.05);
+      gain.gain.linearRampToValueAtTime(0, t+0.4);
+      osc.start(t); osc.stop(t+0.5);
+    });
+  } catch(e) {}
+}
 </script>
 </body>
 </html>
