@@ -111,7 +111,6 @@
     <div class="step-item"><div class="step-num" id="s3">3</div><div class="step-label" id="sl3">ส่ง Slip</div></div>
   </div>
 
-  <!-- Step 1 -->
   <div class="section active" id="step1">
     <label>ชื่อของคุณ</label>
     <input type="text" id="donorName" placeholder="Anonymous" maxlength="40">
@@ -120,7 +119,6 @@
     <button class="btn btn-dark" id="nextBtn" onclick="goToPayment()">ถัดไป — เลือกช่องทางชำระเงิน →</button>
   </div>
 
-  <!-- Step 2 -->
   <div class="section" id="step2">
     <div class="payment-tabs">
       <button class="tab-btn active" onclick="switchTab('promptpay')" id="tab-promptpay">💳 PromptPay</button>
@@ -154,7 +152,6 @@
     <button class="btn btn-outline" onclick="goBack(1)">← แก้ไขข้อมูล</button>
   </div>
 
-  <!-- Step 3 -->
   <div class="section" id="step3">
     <p style="font-size:14px;color:#666;margin-bottom:1.5rem;line-height:1.6;">อัปโหลดสลิปการโอนเงิน ระบบจะตรวจสอบและแสดงชื่อของคุณบน stream ทันที</p>
     <div class="upload-zone" id="uploadZone" onclick="document.getElementById('slipFile').click()">
@@ -173,7 +170,6 @@
     <button class="btn btn-outline" onclick="goBack(2)">← กลับ</button>
   </div>
 
-  <!-- Success -->
   <div class="section" id="stepSuccess">
     <div class="success-page">
       <div class="success-emoji">🎊</div>
@@ -205,14 +201,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getDatabase(app);
 
-// State
 let selectedAmount = null;
 let donationData   = {};
 let slipFile       = null;
 let currentTab     = 'promptpay';
 let cfg            = {};
 
-// Init: load config from Firebase
 async function init() {
   try {
     const snap = await get(child(ref(db), 'config'));
@@ -224,12 +218,10 @@ async function init() {
   document.getElementById('avatarEl').textContent = name[0].toUpperCase();
   document.getElementById('loadingOverlay').style.display = 'none';
 
-  // Amount is read from slip — no manual selection needed
 }
 
-function getAmount() { return null; } // Amount read from slip
+function getAmount() { return null; }
 
-// Steps
 function setStep(n) {
   ['step1','step2','step3','stepSuccess'].forEach(id => document.getElementById(id).classList.remove('active'));
   document.getElementById(n === 'success' ? 'stepSuccess' : 'step'+n).classList.add('active');
@@ -300,7 +292,7 @@ window.verifySlip = async () => {
   }
 
   try {
-    // แปลง image เป็น base64 แล้วส่งผ่าน Netlify Function (proxy) เพื่อหลีกเลี่ยง CORS
+
     const imageBase64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -335,7 +327,6 @@ window.verifySlip = async () => {
 };
 
 async function saveDonation(verifiedAmount) {
-  // ใช้ยอดจากสลิปเป็นหลัก (verifiedAmount) ถ้าไม่มีใช้ 0
   const finalAmount = verifiedAmount || 0;
   showStatus('success', '✅', 'ตรวจสอบสำเร็จ! ยอด ฿' + finalAmount.toLocaleString(), 'กำลังแสดงบน Stream...');
   const donation = {
@@ -346,7 +337,6 @@ async function saveDonation(verifiedAmount) {
     time: new Date().toISOString(),
     method: currentTab
   };
-  // Push to Firebase — dashboard & overlay จะได้รับทันที
   try {
     await push(ref(db, 'donations'), donation);
     await push(ref(db, 'alerts'), { ...donation, seen: false });
