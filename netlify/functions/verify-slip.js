@@ -1,15 +1,10 @@
-// Netlify Function: verify-slip.js
-// รับ slip image จาก browser แล้วส่งต่อไป SlipOK API (bypass CORS)
-
 exports.handler = async (event) => {
-  // CORS headers — อนุญาต kamishirodonate.netlify.app
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
-  // Preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -19,7 +14,6 @@ exports.handler = async (event) => {
   }
 
   try {
-    // รับ base64 image และ apiKey จาก body
     const { imageBase64, mimeType, apiKey } = JSON.parse(event.body || '{}');
 
     if (!imageBase64 || !apiKey) {
@@ -29,12 +23,10 @@ exports.handler = async (event) => {
       };
     }
 
-    // แปลง base64 กลับเป็น binary
     const imageBuffer = Buffer.from(imageBase64, 'base64');
     const mime = mimeType || 'image/jpeg';
     const ext  = mime.includes('png') ? 'png' : 'jpg';
 
-    // ส่งไป SlipOK
     const FormData = require('form-data');
     const fetch    = require('node-fetch');
 
